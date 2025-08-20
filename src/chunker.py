@@ -1,40 +1,30 @@
-# src/chunker.py
-import os
+from pathlib import Path
 
-class Chunker:
-    def __init__(self, input_file="data/processed/cleaned_text.txt",output_file="data/processed/chunks.txt",
-                 chunk_size=500, overlap=50):
-        self.input_file = input_file
-        self.output_file = output_file
-        self.chunk_size = chunk_size
-        self.overlap = overlap
-        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+def run():
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
-    def chunk_text(self, text):
-        words = text.split()
-        chunks = []
-        for i in range(0, len(words), self.chunk_size - self.overlap):
-            chunk = words[i:i + self.chunk_size]
-            chunks.append(" ".join(chunk))
-        return chunks
+    text_path = PROCESSED_DIR / "cleaned_text.txt"
+    if not text_path.exists():
+        print("⚠️ No cleaned_text.txt found.")
+        return
 
-    def process(self):
-        try:
-            with open(self.input_file, "r", encoding="utf-8") as f:
-                text = f.read()
+    text = text_path.read_text(encoding="utf-8")
 
-            chunks = self.chunk_text(text)
+    # --- chunking logic ---
+    words = text.split()
+    chunk_size = 500
+    chunks = [
+        " ".join(words[i:i + chunk_size])
+        for i in range(0, len(words), chunk_size)
+    ]
 
-            with open(self.output_file, "w", encoding="utf-8") as f:
-                for chunk in chunks:
-                    f.write(chunk + "\n\n")
+    with open(PROCESSED_DIR / "chunks.txt", "w", encoding="utf-8") as f:
+        for chunk in chunks:
+            f.write(chunk + "\n\n")
 
-            print(f"Total chunks created: {len(chunks)}")
-            print(f"Chunks saved to: {self.output_file}")
-
-        except Exception as e:
-            print(f"Error during chunking: {e}")
+    print(f"✅ Chunking finished ({len(chunks)} chunks)")
 
 if __name__ == "__main__":
-    chunker = Chunker()
-    chunker.process() # <- The corrected line with parentheses
+    run()
