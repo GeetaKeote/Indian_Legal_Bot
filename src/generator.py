@@ -30,7 +30,7 @@ METADATA_PATH = "data/vector_index/metadata.pkl"
 class Generator:
     def __init__(self):
         # Load embedding model
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2" ,  device="cpu")
 
         # Load FAISS index and metadata files directly
         if not os.path.exists(INDEX_PATH):
