@@ -10,6 +10,9 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 import streamlit as st
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable GPU
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Load environment variables
 load_dotenv()

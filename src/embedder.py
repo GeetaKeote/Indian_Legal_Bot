@@ -2,6 +2,9 @@ from pathlib import Path
 import pickle
 from sentence_transformers import SentenceTransformer
 import faiss
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable GPU
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def run():
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
