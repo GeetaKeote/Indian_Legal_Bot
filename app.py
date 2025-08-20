@@ -3,9 +3,13 @@
 import streamlit as st
 from pathlib import Path
 import os
+import shutil
 
 # Import your pipeline modules
-from src import data_loader, text_cleaner, chunker, embedder
+from src.data_loader import DataLoader
+from src.text_cleaner import TextCleaner
+from src.chunker import Chunker
+from src.embedder import Embedder
 from src.generator import Generator
 
 # App title
@@ -13,7 +17,16 @@ st.set_page_config(page_title="⚖️ Indian Legal Bot", layout="wide")
 st.title("⚖️ Indian Legal Bot")
 st.write("Upload Indian legal documents (PDFs) on the left, then ask your questions here!")
 
-# Sidebar for document upload
+# Paths
+DATA_DIR = Path("data/raw")
+CLEAN_PATH = Path("data/processed/cleaned_text.txt")
+CHUNK_PATH = Path("data/processed/chunks.txt")
+INDEX_DIR = Path("data/vector_index")
+INDEX_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+Path("data/processed").mkdir(parents=True, exist_ok=True)
+
+# Step 1: Sidebar for document upload
 st.sidebar.header("📂 Upload Documents")
 uploaded_files = st.sidebar.file_uploader(
     "Upload PDF files",
@@ -21,72 +34,65 @@ uploaded_files = st.sidebar.file_uploader(
     accept_multiple_files=True
 )
 
-# Paths
-DATA_DIR = Path("data/raw")
-CLEAN_PATH = Path("data/cleaned_text.txt")
-CHUNK_PATH = Path("data/chunks.txt")
-INDEX_DIR = Path("data/vector_index")
-INDEX_DIR.mkdir(parents=True, exist_ok=True)
-
-# Step 1: Save uploaded PDFs
+# Step 2: Handle uploaded PDFs and run the pipeline
 if uploaded_files:
+    # Clear existing files in the raw directory
+    if DATA_DIR.exists():
+        for file in os.listdir(DATA_DIR):
+            os.remove(os.path.join(DATA_DIR, file))
+
     for uploaded_file in uploaded_files:
         save_path = DATA_DIR / uploaded_file.name
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
         with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
     st.sidebar.success("✅ Files uploaded successfully!")
+
+    # Run the data processing pipeline
     with st.spinner("Processing documents..."):
-    # Create an instance of the DataLoader class and run its method
-        loader = data_loader.DataLoader(input_dir=str(DATA_DIR))
-        loader.load_and_combine_files()
+        try:
+            loader = DataLoader(input_dir=str(DATA_DIR))
+            loader.load_and_combine_files()
+            
+            cleaner = TextCleaner()
+            cleaner.process()
+            
+            chunker = Chunker()
+            chunker.process()
+            
+            embedder = Embedder()
+            embedder.create_embeddings()
+            
+            # Use session state to track that the pipeline has run
+            st.session_state["pipeline_run"] = True
+            st.sidebar.success("✅ Documents processed and indexed!")
+            # This reruns the app to initialize the generator with the new files
+            st.experimental_rerun()  
+        except Exception as e:
+            st.sidebar.error(f"Error processing documents: {e}")
 
-    # Create an instance of the TextCleaner class and run its method
-    cleaner = text_cleaner.TextCleaner()
-    cleaner.process()
-
-    # Create an instance of the Chunker class and run its method
-    chunker = chunker.Chunker()
-    chunker.process()
-
-    # Create an instance of the Embedder class and run its method
-    embedder = embedder.Embedder()
-    embedder.create_embeddings()
-
-st.sidebar.success("✅ Documents processed and indexed!")
-    # Step 2: Run pipeline
-    #with st.spinner("Processing documents..."):
-        #data_loader.run()    # Extract text from PDFs → combined_text.txt
-       # text_cleaner.run()   # Clean text → cleaned_text.txt
-       # chunker.run()        # Chunk text → chunks.txt
-       # embedder.run()       # Create FAISS index → faiss_index + metadata.pkl
-    #st.sidebar.success("✅ Documents processed and indexed!")
-
-# Step 3: Initialize Generator
-if "gen" not in st.session_state:
+# Step 3: Initialize Generator only AFTER the pipeline has successfully run
+if "gen" not in st.session_state and st.session_state.get("pipeline_run"):
     try:
         st.session_state.gen = Generator()
     except Exception as e:
         st.error(f"Error initializing Generator: {e}")
         st.stop()
+elif "gen" not in st.session_state:
+    st.info("Upload PDF documents on the left to get started.")
 
-# Step 4: Chat interface
+# Step 4: Chat interface (this part remains the same)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display past messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input box
-if prompt := st.chat_input("Ask a legal question..."):
-    # Show user message
+if "gen" in st.session_state and prompt := st.chat_input("Ask a legal question..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate assistant response
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             answer = st.session_state.gen.generate_answer(prompt)
