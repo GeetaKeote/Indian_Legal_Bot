@@ -1,56 +1,77 @@
+# app.py
+
 import streamlit as st
-from src import data_loader, text_cleaner, chunker, embedder, retriever, generator
 from pathlib import Path
+import os
 
-st.set_page_config(page_title="📘 Indian Legal Bot", layout="wide")
+# Import your pipeline modules
+from src import data_loader, text_cleaner, chunker, embedder
+from src.generator import Generator
 
-# --- Sidebar for file upload ---
-st.sidebar.header("📂 Upload Legal Documents")
+# App title
+st.set_page_config(page_title="⚖️ Indian Legal Bot", layout="wide")
+st.title("⚖️ Indian Legal Bot")
+st.write("Upload Indian legal documents (PDFs) on the left, then ask your questions here!")
+
+# Sidebar for document upload
+st.sidebar.header("📂 Upload Documents")
 uploaded_files = st.sidebar.file_uploader(
-    "Upload PDF/DOCX/TXT files", type=["pdf", "docx", "txt"], accept_multiple_files=True
+    "Upload PDF files",
+    type=["pdf"],
+    accept_multiple_files=True
 )
 
-# --- Process uploaded files ---
+# Paths
+DATA_DIR = Path("data/raw")
+CLEAN_PATH = Path("data/cleaned_text.txt")
+CHUNK_PATH = Path("data/chunks.txt")
+INDEX_DIR = Path("data/vector_index")
+INDEX_DIR.mkdir(parents=True, exist_ok=True)
+
+# Step 1: Save uploaded PDFs
 if uploaded_files:
-    UPLOAD_DIR = Path(__file__).resolve().parent / "data" / "user_uploaded"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
     for uploaded_file in uploaded_files:
-        file_path = UPLOAD_DIR / uploaded_file.name
-        with open(file_path, "wb") as f:
+        save_path = DATA_DIR / uploaded_file.name
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
-    st.sidebar.success("✅ Files uploaded")
+    st.sidebar.success("✅ Files uploaded successfully!")
 
-    # Run pipeline
-    with st.spinner("🔄 Processing documents..."):
-        data_loader.run()
-        text_cleaner.run()
-        chunker.run()
-        embedder.run()
-    st.sidebar.success("✅ Documents processed")
+    # Step 2: Run pipeline
+    with st.spinner("Processing documents..."):
+        data_loader.run()    # Extract text from PDFs → combined_text.txt
+        text_cleaner.run()   # Clean text → cleaned_text.txt
+        chunker.run()        # Chunk text → chunks.txt
+        embedder.run()       # Create FAISS index → faiss_index + metadata.pkl
+    st.sidebar.success("✅ Documents processed and indexed!")
 
-# --- Main chat UI ---
-st.title("⚖️ Indian Legal Bot")
-st.write("Welcome! Upload your legal documents on the left and ask me any questions below 👇")
+# Step 3: Initialize Generator
+if "gen" not in st.session_state:
+    try:
+        st.session_state.gen = Generator()
+    except Exception as e:
+        st.error(f"Error initializing Generator: {e}")
+        st.stop()
 
-# Initialize chat history
+# Step 4: Chat interface
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat history
+# Display past messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# User input
+# Input box
 if prompt := st.chat_input("Ask a legal question..."):
+    # Show user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Generate response
+    # Generate assistant response
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            answer = generator.generate_answer(prompt)  # <- from your generator.py
+            answer = st.session_state.gen.generate_answer(prompt)
             st.markdown(answer)
     st.session_state.messages.append({"role": "assistant", "content": answer})
