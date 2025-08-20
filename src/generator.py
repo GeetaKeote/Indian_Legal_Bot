@@ -9,12 +9,14 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
+import streamlit as st
 
 # Load environment variables
 load_dotenv()
 
 # Set the GOOGLE_API_KEY environment variable.
-google_api_key = os.getenv("GOOGLE_API_KEY")
+#google_api_key = os.getenv("GOOGLE_API_KEY")
+api_key = st.secrets["GOOGLE_API_KEY"]
 if not google_api_key:
     raise ValueError("GOOGLE_API_KEY environment variable not set. Please add it to your .env file or set it in your environment.")
 
