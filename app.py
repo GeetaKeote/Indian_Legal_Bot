@@ -67,7 +67,7 @@ if uploaded_files:
             st.sidebar.success("✅ Documents processed and indexed!")
             
             # Rerun the app to initialize the generator with the new files
-            st.experimental_rerun()  
+            st.rerun()  
         except Exception as e:
             st.sidebar.error(f"Error processing documents: {e}")
 
