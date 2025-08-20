@@ -15,7 +15,7 @@ class Embedder:
         os.makedirs(os.path.dirname(self.faiss_index_file), exist_ok=True)
 
         # Using a free Hugging Face embedding model
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")  
+        self.model = SentenceTransformer("all-MiniLM-L6-v2" , device='cpu')  
 
     def create_embeddings(self):
         try:
