@@ -14,13 +14,14 @@ import streamlit as st
 # Load environment variables
 load_dotenv()
 
-# Set the GOOGLE_API_KEY environment variable.
-#google_api_key = os.getenv("GOOGLE_API_KEY")
-api_key = st.secrets["GOOGLE_API_KEY"]
-if not google_api_key:
-    raise ValueError("GOOGLE_API_KEY environment variable not set. Please add it to your .env file or set it in your environment.")
+# Get API key (check Streamlit secrets first, fallback to .env)
+GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY"))
 
-os.environ["GOOGLE_API_KEY"] = google_api_key
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found. Please set it in Streamlit secrets or .env")
+
+# Set environment variable so LangChain can pick it up
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
 # Paths to stored FAISS index and metadata
 INDEX_PATH = "data/vector_index/faiss_index.bin"
@@ -41,7 +42,7 @@ class Generator:
         with open(METADATA_PATH, "rb") as f:
             self.metadata = pickle.load(f)
 
-        # Initialize the LLM and the chain
+        # Initialize the LLM and chain
         self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
         self.prompt = self.get_prompt_template()
         self.chain = self.prompt | self.llm | StrOutputParser()
