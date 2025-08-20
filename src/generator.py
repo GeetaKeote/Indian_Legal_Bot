@@ -9,21 +9,16 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
-import streamlit as st
-import os
-
 
 # Load environment variables
 load_dotenv()
 
-# Get API key (check Streamlit secrets first, fallback to .env)
-GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY"))
+# Set the GOOGLE_API_KEY environment variable.
+google_api_key = os.getenv("GOOGLE_API_KEY")
+if not google_api_key:
+    raise ValueError("GOOGLE_API_KEY environment variable not set. Please add it to your .env file or set it in your environment.")
 
-if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY not found. Please set it in Streamlit secrets or .env")
-
-# Set environment variable so LangChain can pick it up
-os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+os.environ["GOOGLE_API_KEY"] = google_api_key
 
 # Paths to stored FAISS index and metadata
 INDEX_PATH = "data/vector_index/faiss_index.bin"
@@ -32,10 +27,7 @@ METADATA_PATH = "data/vector_index/metadata.pkl"
 class Generator:
     def __init__(self):
         # Load embedding model
-        self.embedding_model = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"})
-
+        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
         # Load FAISS index and metadata files directly
         if not os.path.exists(INDEX_PATH):
@@ -47,7 +39,7 @@ class Generator:
         with open(METADATA_PATH, "rb") as f:
             self.metadata = pickle.load(f)
 
-        # Initialize the LLM and chain
+        # Initialize the LLM and the chain
         self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
         self.prompt = self.get_prompt_template()
         self.chain = self.prompt | self.llm | StrOutputParser()
@@ -84,8 +76,7 @@ class Generator:
         return bool(re.search(pattern, question.lower()))
 
     def retrieve_similar_chunks(self, query, top_k=3):
-        query_vector = self.embedding_model.embed_query(query)
-
+        query_vector = self.embedding_model.encode([query])
         distances, indices = self.index.search(query_vector, top_k)
         
         results = []

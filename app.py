@@ -36,14 +36,31 @@ if uploaded_files:
         with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
     st.sidebar.success("✅ Files uploaded successfully!")
-
-    # Step 2: Run pipeline
     with st.spinner("Processing documents..."):
-        data_loader.run()    # Extract text from PDFs → combined_text.txt
-        text_cleaner.run()   # Clean text → cleaned_text.txt
-        chunker.run()        # Chunk text → chunks.txt
-        embedder.run()       # Create FAISS index → faiss_index + metadata.pkl
-    st.sidebar.success("✅ Documents processed and indexed!")
+    # Create an instance of the DataLoader class and run its method
+        loader = data_loader.DataLoader(input_dir=str(DATA_DIR))
+        loader.load_and_combine_files()
+
+    # Create an instance of the TextCleaner class and run its method
+    cleaner = text_cleaner.TextCleaner()
+    cleaner.process()
+
+    # Create an instance of the Chunker class and run its method
+    chunker = chunker.Chunker()
+    chunker.process()
+
+    # Create an instance of the Embedder class and run its method
+    embedder = embedder.Embedder()
+    embedder.create_embeddings()
+
+st.sidebar.success("✅ Documents processed and indexed!")
+    # Step 2: Run pipeline
+    #with st.spinner("Processing documents..."):
+        #data_loader.run()    # Extract text from PDFs → combined_text.txt
+       # text_cleaner.run()   # Clean text → cleaned_text.txt
+       # chunker.run()        # Chunk text → chunks.txt
+       # embedder.run()       # Create FAISS index → faiss_index + metadata.pkl
+    #st.sidebar.success("✅ Documents processed and indexed!")
 
 # Step 3: Initialize Generator
 if "gen" not in st.session_state:
