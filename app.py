@@ -65,7 +65,8 @@ if uploaded_files:
             # Use session state to track that the pipeline has run
             st.session_state["pipeline_run"] = True
             st.sidebar.success("✅ Documents processed and indexed!")
-            # This reruns the app to initialize the generator with the new files
+            
+            # Rerun the app to initialize the generator with the new files
             st.experimental_rerun()  
         except Exception as e:
             st.sidebar.error(f"Error processing documents: {e}")
@@ -80,21 +81,28 @@ if "gen" not in st.session_state and st.session_state.get("pipeline_run"):
 elif "gen" not in st.session_state:
     st.info("Upload PDF documents on the left to get started.")
 
-# Step 4: Chat interface (this part remains the same)
+# Step 4: Chat interface
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display past messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if "gen" in st.session_state and prompt := st.chat_input("Ask a legal question..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+# Input box
+if "gen" in st.session_state:
+    prompt = st.chat_input("Ask a legal question...")
+    if prompt:
+        # Show user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            answer = st.session_state.gen.generate_answer(prompt)
-            st.markdown(answer)
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+        # Generate assistant response
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                answer = st.session_state.gen.generate_answer(prompt)
+                st.markdown(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
