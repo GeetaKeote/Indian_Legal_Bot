@@ -6,3 +6,28 @@ docx2txt
 langchain
 langchain-google-genai
 python-dotenv
+torch==2.2.2
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-google-genai==0.0.11
+python-dotenv
+streamlit
+PyMuPDF
+# Core ML
+torch==2.2.2
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+
+# LangChain
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-google-genai==0.0.11
+
+# Streamlit UI
+streamlit==1.35.0
+
+# Utilities
+python-dotenv==1.0.1
+PyMuPDF==1.23.8
