@@ -11,8 +11,7 @@ from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 import streamlit as st
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable GPU
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 # Load environment variables
 load_dotenv()
@@ -33,7 +32,10 @@ METADATA_PATH = "data/vector_index/metadata.pkl"
 class Generator:
     def __init__(self):
         # Load embedding model
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2" ,  device="cpu")
+        self.embedding_model = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"})
+
 
         # Load FAISS index and metadata files directly
         if not os.path.exists(INDEX_PATH):
@@ -82,7 +84,8 @@ class Generator:
         return bool(re.search(pattern, question.lower()))
 
     def retrieve_similar_chunks(self, query, top_k=3):
-        query_vector = self.embedding_model.encode([query])
+        query_vector = self.embedding_model.embed_query(query)
+
         distances, indices = self.index.search(query_vector, top_k)
         
         results = []

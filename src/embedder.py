@@ -3,10 +3,18 @@ import pickle
 from sentence_transformers import SentenceTransformer
 import faiss
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable GPU
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 def run():
+   embedding_model = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"}
+    )
+def run():
+    embedding_model = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"}
+    )
     PROJECT_ROOT = Path(__file__).resolve().parent.parent
     PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
     INDEX_DIR = PROJECT_ROOT / "data" / "index"
