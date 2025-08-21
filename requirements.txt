@@ -6,4 +6,3 @@ faiss-cpu
 langchain
 langchain-google-genai
 google-generativeai
-
