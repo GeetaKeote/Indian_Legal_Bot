@@ -1,13 +1,15 @@
 import os
 import fitz  # PyMuPDF
 import docx2txt
+import argparse
+import textract # used for fallback
 from pathlib import Path
 
 class DataLoader:
-    def __init__(self, input_dir="data/raw", output_file="data/raw/combined_text.txt"):
-        self.input_dir = input_dir
-        self.output_file = output_file
-        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+    def __init__(self, input_dir, output_file):
+        self.input_dir = Path(input_dir)
+        self.output_file = Path(output_file)
+        self.output_file.parent.mkdir(parents=True, exist_ok=True)
 
     def extract_pdf(self, file_path):
         """Extract text from PDF using PyMuPDF."""
@@ -47,13 +49,15 @@ class DataLoader:
 
     def load_and_combine_files(self):
         combined_text = ""
+        if not self.input_dir.exists():
+            print(f"Input directory not found: {self.input_dir}")
+            return
 
         for filename in os.listdir(self.input_dir):
-            file_path = os.path.join(self.input_dir, filename)
-            if os.path.isfile(file_path):
+            file_path = self.input_dir / filename
+            if file_path.is_file():
                 ext = filename.lower().split(".")[-1]
                 text = ""
-
                 print(f"📂 Reading {filename} ...")
 
                 if ext == "pdf":
@@ -66,7 +70,6 @@ class DataLoader:
                     text = self.extract_fallback(file_path)
 
                 print(f"   ➡ Extracted {len(text)} characters.")
-
                 if text.strip():
                     combined_text += f"\n\n###{filename}###\n{text}"
                 else:
@@ -78,5 +81,10 @@ class DataLoader:
         print(f"\n✅ All files combined and saved to: {self.output_file}")
 
 if __name__ == "__main__":
-    loader = DataLoader()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_dir", type=str, required=True)
+    parser.add_argument("--output_file", type=str, required=True)
+    args = parser.parse_args()
+
+    loader = DataLoader(args.input_dir, args.output_file)
     loader.load_and_combine_files()

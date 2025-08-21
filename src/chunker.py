@@ -1,14 +1,14 @@
-# src/chunker.py
 import os
+import argparse
+from pathlib import Path
 
 class Chunker:
-    def __init__(self, input_file="data/processed/cleaned_text.txt", output_file="data/processed/chunks.txt",
-                 chunk_size=500, overlap=50):
-        self.input_file = input_file
-        self.output_file = output_file
+    def __init__(self, input_file, output_file, chunk_size=500, overlap=50):
+        self.input_file = Path(input_file)
+        self.output_file = Path(output_file)
         self.chunk_size = chunk_size
         self.overlap = overlap
-        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+        self.output_file.parent.mkdir(parents=True, exist_ok=True)
 
     def chunk_text(self, text):
         words = text.split()
@@ -17,7 +17,7 @@ class Chunker:
             chunk = words[i:i + self.chunk_size]
             chunks.append(" ".join(chunk))
         return chunks
-
+    
     def process(self):
         try:
             with open(self.input_file, "r", encoding="utf-8") as f:
@@ -34,7 +34,13 @@ class Chunker:
 
         except Exception as e:
             print(f"Error during chunking: {e}")
+            raise
 
 if __name__ == "__main__":
-    chunker = Chunker()
-    chunker.process() # <- The corrected line with parentheses
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_file", type=str, required=True)
+    parser.add_argument("--output_file", type=str, required=True)
+    args = parser.parse_args()
+    
+    chunker = Chunker(args.input_file, args.output_file)
+    chunker.process()

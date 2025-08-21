@@ -1,108 +1,96 @@
-# app.py
+import os
+import sys
+import shutil
+import subprocess
+from pathlib import Path
 
 import streamlit as st
-from pathlib import Path
-import os
-import shutil
-
-# Import your pipeline modules
-from src.data_loader import DataLoader
-from src.text_cleaner import TextCleaner
-from src.chunker import Chunker
-from src.embedder import Embedder
-from src.generator import Generator
-
-# App title
-st.set_page_config(page_title="⚖️ Indian Legal Bot", layout="wide")
-st.title("⚖️ Indian Legal Bot")
-st.write("Upload Indian legal documents (PDFs) on the left, then ask your questions here!")
 
 # Paths
-DATA_DIR = Path("data/raw")
-CLEAN_PATH = Path("data/processed/cleaned_text.txt")
-CHUNK_PATH = Path("data/processed/chunks.txt")
-INDEX_DIR = Path("data/vector_index")
-INDEX_DIR.mkdir(parents=True, exist_ok=True)
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-Path("data/processed").mkdir(parents=True, exist_ok=True)
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_ROOT / "src"
+UPLOAD_DIR = PROJECT_ROOT / "data" / "user_uploaded"
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
+VECTOR_INDEX_DIR = PROJECT_ROOT / "data" / "vector_index"
 
-# Step 1: Sidebar for document upload
-st.sidebar.header("📂 Upload Documents")
-uploaded_files = st.sidebar.file_uploader(
-    "Upload PDF files",
-    type=["pdf"],
-    accept_multiple_files=True
-)
+# Ensure all necessary folders exist
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+VECTOR_INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
-# Step 2: Handle uploaded PDFs and run the pipeline
+st.set_page_config(page_title="Indian Legal Bot", page_icon="⚖️", layout="centered")
+st.markdown("<h1 style='text-align:center;color:#ff6f00;'>⚖️ Indian Legal Bot</h1>", unsafe_allow_html=True)
+st.write("Upload 1-2 legal files (PDF / DOCX / TXT). The app will process them and let you ask questions about the uploaded data.")
+
+uploaded_files = st.file_uploader("📂 Upload files (PDF, DOCX, TXT)", accept_multiple_files=True, type=["pdf", "docx", "txt"])
+
 if uploaded_files:
-    # Clear existing files in the raw directory
-    if DATA_DIR.exists():
-        for file in os.listdir(DATA_DIR):
-            os.remove(os.path.join(DATA_DIR, file))
+    # Clear previous user uploads and data
+    for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
+        if folder.exists():
+            for f in folder.iterdir():
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
 
-    for uploaded_file in uploaded_files:
-        save_path = DATA_DIR / uploaded_file.name
-        with open(save_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-    st.sidebar.success("✅ Files uploaded successfully!")
+    # Save uploaded files to the designated user_uploaded directory
+    for up in uploaded_files:
+        dest = UPLOAD_DIR / up.name
+        with open(dest, "wb") as f:
+            f.write(up.getbuffer())
 
-    # Run the data processing pipeline
-    with st.spinner("Processing documents..."):
-        try:
-            loader = DataLoader(input_dir=str(DATA_DIR))
-            loader.load_and_combine_files()
-            
-            cleaner = TextCleaner()
-            cleaner.process()
-            
-            chunker = Chunker()
-            chunker.process()
-            
-            embedder = Embedder()
-            embedder.create_embeddings()
-            
-            # Use session state to track that the pipeline has run
-            st.session_state["pipeline_run"] = True
-            st.sidebar.success("✅ Documents processed and indexed!")
-            
-            # Rerun the app to initialize the generator with the new files
-            st.rerun()  
-        except Exception as e:
-            st.sidebar.error(f"Error processing documents: {e}")
-
-# Step 3: Initialize Generator only AFTER the pipeline has successfully run
-if "gen" not in st.session_state and st.session_state.get("pipeline_run"):
+    py = sys.executable
+    
+    # Run the pipeline scripts using subprocess, passing file paths as arguments
     try:
-        st.session_state.gen = Generator()
-    except Exception as e:
-        st.error(f"Error initializing Generator: {e}")
+        st.info("📂 Running data loader...")
+        subprocess.run([py, str(SRC_DIR / "data_loader.py"), "--input_dir", str(UPLOAD_DIR), "--output_file", str(RAW_DIR / "combined_text.txt")], check=True)
+
+        st.info("✨ Cleaning text...")
+        subprocess.run([py, str(SRC_DIR / "text_cleaner.py"), "--input_file", str(RAW_DIR / "combined_text.txt"), "--output_file", str(PROCESSED_DIR / "cleaned_text.txt")], check=True)
+
+        st.info("✂️ Chunking text...")
+        subprocess.run([py, str(SRC_DIR / "chunker.py"), "--input_file", str(PROCESSED_DIR / "cleaned_text.txt"), "--output_file", str(PROCESSED_DIR / "chunked_text.txt")], check=True)
+
+        st.info("🧠 Creating embeddings & building FAISS index...")
+        subprocess.run([py, str(SRC_DIR / "embedder.py"), "--input_file", str(PROCESSED_DIR / "chunked_text.txt"), "--faiss_index_file", str(VECTOR_INDEX_DIR / "faiss_index.bin"), "--metadata_file", str(VECTOR_INDEX_DIR / "metadata.pkl")], check=True)
+
+        st.success("✅ Pipeline finished. Vector index and metadata are ready.")
+
+    except subprocess.CalledProcessError as e:
+        st.error(f"A script in the pipeline failed: {e}")
         st.stop()
-elif "gen" not in st.session_state:
-    st.info("Upload PDF documents on the left to get started.")
+    except FileNotFoundError as e:
+        st.error(f"Required script or file not found: {e}")
+        st.stop()
+    
+    # Import and instantiate the Generator class, which is now cached
+    try:
+        sys.path.append(str(PROJECT_ROOT))
+        from src.generator import Generator
+        generator_instance = Generator()
 
-# Step 4: Chat interface
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+    except Exception as e:
+        st.error(f"Error importing or initializing Generator: {e}")
+        st.stop()
+    
+    st.info("Upload processing complete. Ask questions below about the uploaded documents.")
 
-# Display past messages
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# Input box
-if "gen" in st.session_state:
-    prompt = st.chat_input("Ask a legal question...")
-    if prompt:
-        # Show user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Generate assistant response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                answer = st.session_state.gen.generate_answer(prompt)
-                st.markdown(answer)
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-
+    question = st.text_input("💬 Ask a legal question about uploaded files:")
+    if st.button("Get Answer"):
+        if not question.strip():
+            st.warning("Please type a question.")
+        else:
+            with st.spinner("Retrieving context and generating answer..."):
+                try:
+                    answer = generator_instance.generate_answer(question, top_k=3)
+                    st.markdown("### ✅ Answer:")
+                    st.write(answer)
+                except Exception as e:
+                    st.error(f"Error generating answer: {e}")
+else:
+    st.info("No files uploaded yet. Upload files to enable question answering.")
+    st.write("Tip: upload 1 or 2 relevant legal judgments / law docs and then ask questions about them.")
