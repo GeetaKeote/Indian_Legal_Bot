@@ -24,6 +24,7 @@ os.environ["GOOGLE_API_KEY"] = google_api_key
 INDEX_PATH = "data/vector_index/faiss_index.bin"
 METADATA_PATH = "data/vector_index/metadata.pkl"
 
+@st.cache_resource
 class Generator:
     def __init__(self):
         # Load embedding model
