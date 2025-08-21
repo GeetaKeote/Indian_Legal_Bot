@@ -1,90 +1,46 @@
+# src/data_loader.py
 import os
-import fitz  # PyMuPDF
-import docx2txt
+import textract
 import argparse
-import textract # used for fallback
-from pathlib import Path
 
 class DataLoader:
     def __init__(self, input_dir, output_file):
-        self.input_dir = Path(input_dir)
-        self.output_file = Path(output_file)
-        self.output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    def extract_pdf(self, file_path):
-        """Extract text from PDF using PyMuPDF."""
-        text = ""
-        try:
-            with fitz.open(file_path) as doc:
-                for page in doc:
-                    text += page.get_text()
-        except Exception as e:
-            print(f"[PDF Error] {file_path}: {e}")
-        return text
-
-    def extract_docx(self, file_path):
-        """Extract text from DOCX using docx2txt."""
-        try:
-            return docx2txt.process(file_path) or ""
-        except Exception as e:
-            print(f"[DOCX Error] {file_path}: {e}")
-            return ""
-
-    def extract_txt(self, file_path):
-        """Read text file directly."""
-        try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                return f.read()
-        except Exception as e:
-            print(f"[TXT Error] {file_path}: {e}")
-            return ""
-
-    def extract_fallback(self, file_path):
-        """Fallback: Try textract for unknown formats."""
-        try:
-            return textract.process(file_path).decode("utf-8", errors="ignore")
-        except Exception as e:
-            print(f"[Fallback Error] {file_path}: {e}")
-            return ""
+        self.input_dir = input_dir
+        self.output_file = output_file
+        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
 
     def load_and_combine_files(self):
         combined_text = ""
-        if not self.input_dir.exists():
-            print(f"Input directory not found: {self.input_dir}")
+        # Check if the input directory exists and has files
+        if not os.path.exists(self.input_dir) or not os.listdir(self.input_dir):
+            print(f"Warning: Input directory '{self.input_dir}' is empty or does not exist.")
+            # Create an empty output file and exit gracefully
+            with open(self.output_file, "w", encoding="utf-8") as f:
+                f.write("")
             return
 
         for filename in os.listdir(self.input_dir):
-            file_path = self.input_dir / filename
-            if file_path.is_file():
-                ext = filename.lower().split(".")[-1]
-                text = ""
-                print(f"📂 Reading {filename} ...")
-
-                if ext == "pdf":
-                    text = self.extract_pdf(file_path)
-                elif ext in ["docx", "doc"]:
-                    text = self.extract_docx(file_path)
-                elif ext == "txt":
-                    text = self.extract_txt(file_path)
-                else:
-                    text = self.extract_fallback(file_path)
-
-                print(f"   ➡ Extracted {len(text)} characters.")
-                if text.strip():
+            file_path = os.path.join(self.input_dir, filename)
+            if os.path.isfile(file_path):
+                try:
+                    print(f'Reading...{filename}')
+                    text = textract.process(file_path).decode('utf-8', errors='ignore')
                     combined_text += f"\n\n###{filename}###\n{text}"
-                else:
-                    print(f"⚠ Warning: No text extracted from {filename}")
+
+                except Exception as e:
+                    print(f'Error While Reading File {filename}:{e}')
 
         with open(self.output_file, "w", encoding="utf-8") as f:
             f.write(combined_text)
 
-        print(f"\n✅ All files combined and saved to: {self.output_file}")
+        print(f'\nAll files combined and saved to: {self.output_file}')
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", type=str, required=True)
-    parser.add_argument("--output_file", type=str, required=True)
+    parser = argparse.ArgumentParser(description="Loads and combines text from documents.")
+    parser.add_argument("--input_dir", type=str, required=True, help="Directory containing input files.")
+    parser.add_argument("--output_file", type=str, required=True, help="Path for the combined output text file.")
     args = parser.parse_args()
 
-    loader = DataLoader(args.input_dir, args.output_file)
+    loader = DataLoader(input_dir=args.input_dir, output_file=args.output_file)
     loader.load_and_combine_files()
