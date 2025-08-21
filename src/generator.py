@@ -1,5 +1,5 @@
 # src/generator.py
-
+import streamlit as st
 import os
 import pickle
 import faiss
