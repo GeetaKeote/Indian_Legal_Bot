@@ -1,4 +1,3 @@
-import os
 import faiss
 import pickle
 import argparse
@@ -16,28 +15,19 @@ class Embedder:
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
     def create_embeddings(self):
-        try:
-            with open(self.input_file, "r", encoding="utf-8") as f:
-                documents = f.read().split("\n\n")
+        with open(self.input_file, "r", encoding="utf-8") as f:
+            documents = f.read().split("\n\n")
 
-            embeddings = self.model.encode(documents, convert_to_numpy=True)
-            embeddings = np.array(embeddings, dtype=np.float32)
+        embeddings = self.model.encode(documents, convert_to_numpy=True)
+        embeddings = np.array(embeddings, dtype=np.float32)
 
-            dimension = embeddings[0].shape[0]
-            index = faiss.IndexFlatL2(dimension)
-            index.add(embeddings)
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dimension)
+        index.add(embeddings)
 
-            faiss.write_index(index, str(self.faiss_index_file))
-
-            with open(self.metadata_file, "wb") as f:
-                pickle.dump(documents, f)
-
-            print(f" FAISS index saved to {self.faiss_index_file}")
-            print(f" Metadata saved to {self.metadata_file}")
-
-        except Exception as e:
-            print(f"Error creating embeddings: {e}")
-            raise
+        faiss.write_index(index, str(self.faiss_index_file))
+        with open(self.metadata_file, "wb") as f:
+            pickle.dump(documents, f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

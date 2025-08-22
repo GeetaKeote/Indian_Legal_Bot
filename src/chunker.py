@@ -1,4 +1,3 @@
-import os
 import argparse
 from pathlib import Path
 
@@ -17,30 +16,20 @@ class Chunker:
             chunk = words[i:i + self.chunk_size]
             chunks.append(" ".join(chunk))
         return chunks
-    
+
     def process(self):
-        try:
-            with open(self.input_file, "r", encoding="utf-8") as f:
-                text = f.read()
-
-            chunks = self.chunk_text(text)
-
-            with open(self.output_file, "w", encoding="utf-8") as f:
-                for chunk in chunks:
-                    f.write(chunk + "\n\n")
-
-            print(f"Total chunks created: {len(chunks)}")
-            print(f"Chunks saved to: {self.output_file}")
-
-        except Exception as e:
-            print(f"Error during chunking: {e}")
-            raise
+        with open(self.input_file, "r", encoding="utf-8") as f:
+            text = f.read()
+        chunks = self.chunk_text(text)
+        with open(self.output_file, "w", encoding="utf-8") as f:
+            for chunk in chunks:
+                f.write(chunk + "\n\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_file", type=str, required=True)
     parser.add_argument("--output_file", type=str, required=True)
     args = parser.parse_args()
-    
+
     chunker = Chunker(args.input_file, args.output_file)
     chunker.process()

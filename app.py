@@ -1,4 +1,3 @@
-# app.py
 import os
 import sys
 import subprocess
@@ -13,66 +12,85 @@ RAW_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 VECTOR_INDEX_DIR = PROJECT_ROOT / "data" / "vector_index"
 
-for d in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
-    d.mkdir(parents=True, exist_ok=True)
+# Ensure folders exist
+for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
+    folder.mkdir(parents=True, exist_ok=True)
 
-st.set_page_config(page_title="⚖️ Indian Legal Bot", layout="wide")
+st.set_page_config(page_title="Indian Legal Bot", page_icon="⚖️", layout="wide")
 
-# Layout: left (upload) | right (chat)
+# Centered Title
+st.markdown("<h1 style='text-align:center;color:#ff6f00;'>⚖️ Indian Legal Bot</h1>", unsafe_allow_html=True)
+
+# Left (Upload) / Right (Q&A) Layout
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.header("📂 Upload Documents")
+    st.subheader("📂 Upload Documents")
     uploaded_files = st.file_uploader("Upload PDF/DOCX/TXT", type=["pdf", "docx", "txt"], accept_multiple_files=True)
 
-    if uploaded_files:
-        for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
-            for f in folder.iterdir():
-                f.unlink()
+# Run pipeline if new files uploaded
+if uploaded_files:
+    # Clear old files
+    for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
+        for f in folder.iterdir():
+            try: f.unlink()
+            except Exception: pass
 
-        for up in uploaded_files:
-            dest = UPLOAD_DIR / up.name
-            with open(dest, "wb") as f:
-                f.write(up.getbuffer())
+    # Save uploaded
+    for up in uploaded_files:
+        dest = UPLOAD_DIR / up.name
+        with open(dest, "wb") as f:
+            f.write(up.getbuffer())
 
-        py = sys.executable
-        try:
-            st.info("📂 Running data loader...")
-            subprocess.run([py, str(SRC_DIR / "data_loader.py"), "--input_dir", str(UPLOAD_DIR), "--output_file", str(RAW_DIR / "combined_text.txt")], check=True)
-
-            st.info("✨ Cleaning text...")
-            subprocess.run([py, str(SRC_DIR / "text_cleaner.py"), "--input_file", str(RAW_DIR / "combined_text.txt"), "--output_file", str(PROCESSED_DIR / "cleaned_text.txt")], check=True)
-
-            st.info("✂️ Chunking...")
-            subprocess.run([py, str(SRC_DIR / "chunker.py"), "--input_file", str(PROCESSED_DIR / "cleaned_text.txt"), "--output_file", str(PROCESSED_DIR / "chunked_text.txt")], check=True)
-
-            st.info("🧠 Creating embeddings...")
-            subprocess.run([py, str(SRC_DIR / "embedder.py"), "--input_file", str(PROCESSED_DIR / "chunked_text.txt"), "--faiss_index_file", str(VECTOR_INDEX_DIR / "faiss_index.bin"), "--metadata_file", str(VECTOR_INDEX_DIR / "metadata.pkl")], check=True)
-
-            st.success("✅ Processing complete!")
-
-        except subprocess.CalledProcessError as e:
-            st.error(f"Pipeline failed: {e}")
-            st.stop()
-
-with col2:
-    st.header("⚖️ Indian Legal Bot")
+    py = sys.executable
     try:
-        sys.path.append(str(PROJECT_ROOT))
-        from src.generator import get_generator
-        gen = get_generator()
-    except Exception as e:
-        st.error(f"Error initializing Generator: {e}")
+        st.info("📂 Running Data Loader...")
+        subprocess.run([py, str(SRC_DIR / "data_loader.py"),
+                        "--input_dir", str(UPLOAD_DIR),
+                        "--output_file", str(RAW_DIR / "combined_text.txt")], check=True)
+
+        st.info("✨ Cleaning text...")
+        subprocess.run([py, str(SRC_DIR / "text_cleaner.py"),
+                        "--input_file", str(RAW_DIR / "combined_text.txt"),
+                        "--output_file", str(PROCESSED_DIR / "cleaned_text.txt")], check=True)
+
+        st.info("✂️ Chunking text...")
+        subprocess.run([py, str(SRC_DIR / "chunker.py"),
+                        "--input_file", str(PROCESSED_DIR / "cleaned_text.txt"),
+                        "--output_file", str(PROCESSED_DIR / "chunked_text.txt")], check=True)
+
+        st.info("🧠 Creating embeddings...")
+        subprocess.run([py, str(SRC_DIR / "embedder.py"),
+                        "--input_file", str(PROCESSED_DIR / "chunked_text.txt"),
+                        "--faiss_index_file", str(VECTOR_INDEX_DIR / "faiss_index.bin"),
+                        "--metadata_file", str(VECTOR_INDEX_DIR / "metadata.pkl")], check=True)
+
+        st.success("✅ Documents processed & indexed successfully.")
+
+    except subprocess.CalledProcessError as e:
+        st.error(f"Pipeline failed: {e}")
         st.stop()
 
+# Import Generator only after pipeline
+try:
+    sys.path.append(str(PROJECT_ROOT))
+    from src.generator import Generator
+    generator_instance = Generator()
+except Exception as e:
+    st.error(f"Error initializing Generator: {e}")
+    generator_instance = None
+
+# Q&A Section
+with col2:
+    st.subheader("💬 Ask Questions")
     question = st.text_input("Ask a legal question:")
-    if st.button("Get Answer"):
+    if st.button("Get Answer") and generator_instance:
         if not question.strip():
             st.warning("Please type a question.")
         else:
             with st.spinner("Thinking..."):
                 try:
-                    answer = gen.generate_answer(question)
+                    answer = generator_instance.generate_answer(question, top_k=3)
                     st.markdown("### ✅ Answer:")
                     st.write(answer)
                 except Exception as e:
