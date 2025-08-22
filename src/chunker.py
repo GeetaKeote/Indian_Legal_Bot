@@ -20,10 +20,14 @@ class Chunker:
     def process(self):
         with open(self.input_file, "r", encoding="utf-8") as f:
             text = f.read()
+
         chunks = self.chunk_text(text)
+
         with open(self.output_file, "w", encoding="utf-8") as f:
             for chunk in chunks:
                 f.write(chunk + "\n\n")
+
+        print(f"✅ {len(chunks)} chunks saved to {self.output_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

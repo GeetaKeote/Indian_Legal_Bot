@@ -2,8 +2,8 @@ import faiss
 import pickle
 import argparse
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
+from sentence_transformers import SentenceTransformer
 
 class Embedder:
     def __init__(self, input_file, faiss_index_file, metadata_file):
@@ -21,13 +21,16 @@ class Embedder:
         embeddings = self.model.encode(documents, convert_to_numpy=True)
         embeddings = np.array(embeddings, dtype=np.float32)
 
-        dimension = embeddings.shape[1]
+        dimension = embeddings[0].shape[0]
         index = faiss.IndexFlatL2(dimension)
         index.add(embeddings)
 
         faiss.write_index(index, str(self.faiss_index_file))
         with open(self.metadata_file, "wb") as f:
             pickle.dump(documents, f)
+
+        print(f"✅ FAISS index saved: {self.faiss_index_file}")
+        print(f"✅ Metadata saved: {self.metadata_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

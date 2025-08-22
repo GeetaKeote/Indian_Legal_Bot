@@ -1,7 +1,6 @@
 import os
 import pickle
 import faiss
-import re
 from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -31,17 +30,18 @@ class Generator:
         return [self.metadata[idx] for idx in indices[0] if idx != -1]
 
     def generate_answer(self, question, top_k=3):
+        # 🔹 Always include PDF context (no "legal keyword" blocking anymore)
         context_chunks = self.retrieve_similar_chunks(question, top_k=top_k)
         if not context_chunks:
             return "I don't have enough legal information to answer that."
 
         context_text = "\n".join(context_chunks)
         prompt = f"""
-        You are an Indian Legal Assistant.
-        Answer the question strictly based on the given context.
-        If not found, say "I don't have enough legal information to answer that."
+        You are an **Indian Legal Assistant**.
+        Answer strictly based on the uploaded document context below.
+        If not found, say: "I don't have enough legal information to answer that."
 
-        Context:
+        Context from uploaded files:
         {context_text}
 
         Question:

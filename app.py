@@ -28,48 +28,48 @@ with col1:
     st.subheader("📂 Upload Documents")
     uploaded_files = st.file_uploader("Upload PDF/DOCX/TXT", type=["pdf", "docx", "txt"], accept_multiple_files=True)
 
-# Run pipeline if new files uploaded
-if uploaded_files:
-    # Clear old files
-    for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
-        for f in folder.iterdir():
-            try: f.unlink()
-            except Exception: pass
+    # Run pipeline if new files uploaded
+    if uploaded_files:
+        # Clear old files
+        for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
+            for f in folder.iterdir():
+                try: f.unlink()
+                except Exception: pass
 
-    # Save uploaded
-    for up in uploaded_files:
-        dest = UPLOAD_DIR / up.name
-        with open(dest, "wb") as f:
-            f.write(up.getbuffer())
+        # Save uploaded
+        for up in uploaded_files:
+            dest = UPLOAD_DIR / up.name
+            with open(dest, "wb") as f:
+                f.write(up.getbuffer())
 
-    py = sys.executable
-    try:
-        st.info("📂 Running Data Loader...")
-        subprocess.run([py, str(SRC_DIR / "data_loader.py"),
-                        "--input_dir", str(UPLOAD_DIR),
-                        "--output_file", str(RAW_DIR / "combined_text.txt")], check=True)
+        py = sys.executable
+        try:
+            st.info("📂 Running Data Loader...")
+            subprocess.run([py, str(SRC_DIR / "data_loader.py"),
+                            "--input_dir", str(UPLOAD_DIR),
+                            "--output_file", str(RAW_DIR / "combined_text.txt")], check=True)
 
-        st.info("✨ Cleaning text...")
-        subprocess.run([py, str(SRC_DIR / "text_cleaner.py"),
-                        "--input_file", str(RAW_DIR / "combined_text.txt"),
-                        "--output_file", str(PROCESSED_DIR / "cleaned_text.txt")], check=True)
+            st.info("✨ Cleaning text...")
+            subprocess.run([py, str(SRC_DIR / "text_cleaner.py"),
+                            "--input_file", str(RAW_DIR / "combined_text.txt"),
+                            "--output_file", str(PROCESSED_DIR / "cleaned_text.txt")], check=True)
 
-        st.info("✂️ Chunking text...")
-        subprocess.run([py, str(SRC_DIR / "chunker.py"),
-                        "--input_file", str(PROCESSED_DIR / "cleaned_text.txt"),
-                        "--output_file", str(PROCESSED_DIR / "chunked_text.txt")], check=True)
+            st.info("✂️ Chunking text...")
+            subprocess.run([py, str(SRC_DIR / "chunker.py"),
+                            "--input_file", str(PROCESSED_DIR / "cleaned_text.txt"),
+                            "--output_file", str(PROCESSED_DIR / "chunked_text.txt")], check=True)
 
-        st.info("🧠 Creating embeddings...")
-        subprocess.run([py, str(SRC_DIR / "embedder.py"),
-                        "--input_file", str(PROCESSED_DIR / "chunked_text.txt"),
-                        "--faiss_index_file", str(VECTOR_INDEX_DIR / "faiss_index.bin"),
-                        "--metadata_file", str(VECTOR_INDEX_DIR / "metadata.pkl")], check=True)
+            st.info("🧠 Creating embeddings...")
+            subprocess.run([py, str(SRC_DIR / "embedder.py"),
+                            "--input_file", str(PROCESSED_DIR / "chunked_text.txt"),
+                            "--faiss_index_file", str(VECTOR_INDEX_DIR / "faiss_index.bin"),
+                            "--metadata_file", str(VECTOR_INDEX_DIR / "metadata.pkl")], check=True)
 
-        st.success("✅ Documents processed & indexed successfully.")
+            st.success("✅ Documents processed & indexed successfully.")
 
-    except subprocess.CalledProcessError as e:
-        st.error(f"Pipeline failed: {e}")
-        st.stop()
+        except subprocess.CalledProcessError as e:
+            st.error(f"Pipeline failed: {e}")
+            st.stop()
 
 # Import Generator only after pipeline
 try:

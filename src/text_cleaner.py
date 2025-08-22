@@ -10,6 +10,7 @@ class TextCleaner:
 
     def clean_text(self, text):
         text = re.sub(r'\s+', ' ', text)
+        text = text.replace('\t', ' ').replace('\f', '')
         text = re.sub(r'\n{2,}', "\n\n", text)
         return text.strip()
 
@@ -18,8 +19,11 @@ class TextCleaner:
             raw_text = f.read()
 
         cleaned_text = self.clean_text(raw_text)
+
         with open(self.output_file, "w", encoding="utf-8") as f:
             f.write(cleaned_text)
+
+        print(f"✅ Cleaned text saved to {self.output_file}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
