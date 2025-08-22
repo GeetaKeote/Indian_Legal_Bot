@@ -26,10 +26,10 @@ METADATA_PATH = "data/vector_index/metadata.pkl"
 @st.cache_resource
 class Generator:
     def __init__(self):
-        # Always CPU safe
+        # Embedding model
         self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
 
-        # ✅ Use free Gemini model
+        # Free Gemini model
         self.llm = genai.GenerativeModel("gemini-1.5-flash")
 
         try:
@@ -41,9 +41,9 @@ class Generator:
             self.index = None
             self.metadata = []
     
-    def is_legal_question(self, question: str) -> bool:
+    def is_probably_legal(self, question: str) -> bool:
         """
-        Checks if the question contains Indian legal context keywords.
+        Heuristic: check if question looks like legal context.
         """
         legal_keywords = [
             "law", "legal", "judgement", "ipc", "case", "act", "rights",
@@ -54,9 +54,6 @@ class Generator:
         return bool(re.search(pattern, question.lower()))
 
     def retrieve_similar_chunks(self, query: str, top_k: int = 3):
-        """
-        Retrieves most relevant text chunks from FAISS index.
-        """
         if self.index is None or not self.metadata:
             return []
             
@@ -71,20 +68,17 @@ class Generator:
 
     def generate_answer(self, question: str, top_k: int = 3) -> str:
         """
-        Combines legal filter + retrieved chunks + Gemini-Flash answer.
+        Use PDF context always, warn if question seems non-legal.
         """
-        if not self.is_legal_question(question):
-            return "⚠️ I can only answer questions related to Indian law."
-
         context_chunks = self.retrieve_similar_chunks(question, top_k=top_k)
         if not context_chunks:
-             return "⚠️ I don't have enough legal information in the uploaded documents to answer that."
+             return "⚠️ I could not find enough relevant information in the uploaded documents to answer that."
 
         context_text = "\n".join(context_chunks)
         
         prompt = f"""
         You are an Indian Legal Assistant.
-        Answer the question strictly based on the given context from uploaded documents.
+        Use ONLY the given context from uploaded documents to answer.
         If the answer is not in the context, say:
         "I don't have enough legal information in the uploaded documents to answer that."
 
@@ -97,6 +91,12 @@ class Generator:
 
         try:
             response = self.llm.generate_content(prompt)
-            return response.text.strip()
+            final_answer = response.text.strip()
+
+            # Add a soft legal warning if it doesn't look legal
+            if not self.is_probably_legal(question):
+                final_answer += "\n\n⚠️ Note: Your question may not be directly legal, but I tried to answer using the uploaded documents."
+
+            return final_answer
         except Exception as e:
             return f"⚠️ Error generating answer: {e}"
