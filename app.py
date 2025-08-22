@@ -56,7 +56,7 @@ with col1:
             st.stop()
 
 with col2:
-    st.header("💬 Legal Q&A")
+    st.header("⚖️ Indian Legal Bot")
     try:
         sys.path.append(str(PROJECT_ROOT))
         from src.generator import get_generator
