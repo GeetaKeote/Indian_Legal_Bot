@@ -1,17 +1,13 @@
 # app.py
 import os
+import sys
+import subprocess
 from pathlib import Path
 import streamlit as st
 
-# Import pipeline modules
-from src.data_loader import DataLoader
-from src.text_cleaner import TextCleaner
-from src.chunker import Chunker
-from src.embedder import Embedder
-from src.generator import Generator
-
 # Paths
 PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_ROOT / "src"
 UPLOAD_DIR = PROJECT_ROOT / "data" / "user_uploaded"
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
@@ -20,84 +16,64 @@ VECTOR_INDEX_DIR = PROJECT_ROOT / "data" / "vector_index"
 for d in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
-# Streamlit UI
-st.set_page_config(page_title="Indian Legal Bot", page_icon="⚖️", layout="wide")
-st.markdown("<h1 style='text-align:center;color:#ff6f00;'>⚖️ Indian Legal Bot</h1>", unsafe_allow_html=True)
-st.write("Upload Indian legal files (PDF/DOCX/TXT) and then ask your legal questions.")
+st.set_page_config(page_title="⚖️ Indian Legal Bot", layout="wide")
 
-# Two-column layout
+# Layout: left (upload) | right (chat)
 col1, col2 = st.columns([1, 2])
 
-# -------- Left Panel (Upload & Processing) --------
 with col1:
-    st.subheader("📂 Upload & Process")
-    uploaded_files = st.file_uploader("Upload legal files", type=["pdf", "docx", "txt"], accept_multiple_files=True)
+    st.header("📂 Upload Documents")
+    uploaded_files = st.file_uploader("Upload PDF/DOCX/TXT", type=["pdf", "docx", "txt"], accept_multiple_files=True)
 
     if uploaded_files:
-        # Clear old files
         for folder in [UPLOAD_DIR, RAW_DIR, PROCESSED_DIR, VECTOR_INDEX_DIR]:
-            for f in folder.glob("*"):
+            for f in folder.iterdir():
                 f.unlink()
 
-        # Save uploaded files
         for up in uploaded_files:
             dest = UPLOAD_DIR / up.name
             with open(dest, "wb") as f:
                 f.write(up.getbuffer())
-        st.success("✅ Files uploaded!")
 
+        py = sys.executable
         try:
-            with st.spinner("📂 Loading data..."):
-                loader = DataLoader(input_dir=UPLOAD_DIR, output_file=RAW_DIR / "combined_text.txt")
-                loader.load_and_combine_files()
+            st.info("📂 Running data loader...")
+            subprocess.run([py, str(SRC_DIR / "data_loader.py"), "--input_dir", str(UPLOAD_DIR), "--output_file", str(RAW_DIR / "combined_text.txt")], check=True)
 
-            with st.spinner("✨ Cleaning text..."):
-                cleaner = TextCleaner()
-                cleaner.process()
+            st.info("✨ Cleaning text...")
+            subprocess.run([py, str(SRC_DIR / "text_cleaner.py"), "--input_file", str(RAW_DIR / "combined_text.txt"), "--output_file", str(PROCESSED_DIR / "cleaned_text.txt")], check=True)
 
-            with st.spinner("✂️ Chunking text..."):
-                chunker = Chunker()
-                chunker.process()
+            st.info("✂️ Chunking...")
+            subprocess.run([py, str(SRC_DIR / "chunker.py"), "--input_file", str(PROCESSED_DIR / "cleaned_text.txt"), "--output_file", str(PROCESSED_DIR / "chunked_text.txt")], check=True)
 
-            with st.spinner("🧠 Creating embeddings..."):
-                embedder = Embedder()
-                embedder.create_embeddings()
+            st.info("🧠 Creating embeddings...")
+            subprocess.run([py, str(SRC_DIR / "embedder.py"), "--input_file", str(PROCESSED_DIR / "chunked_text.txt"), "--faiss_index_file", str(VECTOR_INDEX_DIR / "faiss_index.bin"), "--metadata_file", str(VECTOR_INDEX_DIR / "metadata.pkl")], check=True)
 
-            st.success("✅ Documents processed and indexed!")
+            st.success("✅ Processing complete!")
 
-            if "gen" not in st.session_state:
-                st.session_state.gen = Generator()
-
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
             st.error(f"Pipeline failed: {e}")
             st.stop()
 
-# -------- Right Panel (Chat Interface) --------
 with col2:
-    st.subheader("💬 Legal Q&A")
+    st.header("💬 Legal Q&A")
+    try:
+        sys.path.append(str(PROJECT_ROOT))
+        from src.generator import get_generator
+        gen = get_generator()
+    except Exception as e:
+        st.error(f"Error initializing Generator: {e}")
+        st.stop()
 
-    if "gen" in st.session_state:
-        if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "👋 Welcome! Upload your legal docs on the left and then ask me questions here."}]
-
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-
-        prompt = st.chat_input("Type your legal question...")
-        if prompt:
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
-            with st.chat_message("assistant"):
-                with st.spinner("⚖️ Thinking..."):
-                    try:
-                        answer = st.session_state.gen.generate_answer(prompt)
-                    except Exception as e:
-                        answer = f"Error generating answer: {e}"
-                    st.markdown(answer)
-
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-    else:
-        st.info("👈 Upload files first (left panel).")
+    question = st.text_input("Ask a legal question:")
+    if st.button("Get Answer"):
+        if not question.strip():
+            st.warning("Please type a question.")
+        else:
+            with st.spinner("Thinking..."):
+                try:
+                    answer = gen.generate_answer(question)
+                    st.markdown("### ✅ Answer:")
+                    st.write(answer)
+                except Exception as e:
+                    st.error(f"Error generating answer: {e}")
