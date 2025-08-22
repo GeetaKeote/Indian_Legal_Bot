@@ -60,4 +60,20 @@ class DataLoader:
                 elif ext == "txt":
                     text = self.extract_txt(file_path)
                 else:
-                    print(f"Unsupported file
+                    print(f"Unsupported file format: {filename}")
+                combined_text += f"\n\n###{filename}###\n{text}"
+
+        with open(self.output_file, "w", encoding="utf-8") as f:
+            f.write(combined_text)
+
+        print(f"✅ All files combined into: {self.output_file}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Loads and combines text from documents.")
+    parser.add_argument("--input_dir", type=str, required=True)
+    parser.add_argument("--output_file", type=str, required=True)
+    args = parser.parse_args()
+
+    loader = DataLoader(input_dir=args.input_dir, output_file=args.output_file)
+    loader.load_and_combine_files()
